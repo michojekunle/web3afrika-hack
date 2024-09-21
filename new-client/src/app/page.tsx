@@ -1,217 +1,210 @@
-// @ts-nocheck
-"use client";
+'use client'
 
-import { useState } from "react";
-import {
-  useAccount,
-  useContractRead,
-  useContractWrite,
-  useBalance,
-} from "wagmi";
-import { parseEther } from "viem";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { Button } from "@/src/components/ui/button";
-import { Input } from "@/src/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/src/components/ui/card";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/src/components/ui/tabs";
-import { AlertCircle, Zap, PlusCircle, User, Wallet } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
+import { useState } from 'react'
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { Switch } from "@/src/components/ui/switch"
+import { Button } from "@/src/components/ui/button"
+import { Input } from "@/src/components/ui/input"
+import { Label } from "@/src/components/ui/label"
+import { Tooltip } from "@/src/components/ui/tooltip"
+import { TooltipContent, TooltipProvider, TooltipTrigger } from "@/src/components/ui/tooltip"
+import { useToast } from "@/src/components/ui/use-toast"
+import { Moon, Sun } from "lucide-react"
 
-const CONTRACT_ADDRESS = "0x...";
-const CONTRACT_ABI: any = [
-  /* ... */
-];
+// ABI and contract address would be imported from a separate file in a real application
+const contractABI = [
+  // ... (contract ABI would go here)
+] as const
 
-export default function Home() {
-  const { address, isConnected } = useAccount();
-  const [topUpAmount, setTopUpAmount] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+const contractAddress = "0x..." as const
 
-  const { data: balance } = useBalance({
-    address: address,
-  });
+export default function App() {
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [eventId, setEventId] = useState<string>('')
+  const [eventName, setEventName] = useState<string>('')
+  const [eventDate, setEventDate] = useState<string>('')
+  const [nftAddress, setNftAddress] = useState<string>('')
+  const [maxCapacity, setMaxCapacity] = useState<string>('')
+  const { address, isConnected } = useAccount()
+  const { toast } = useToast()
 
-  const { data: isRegistered } = useContractRead({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: "isRegistered",
-    args: [address],
-  });
+  const { data: isOwner } = useReadContract({
+    address: contractAddress,
+    abi: contractABI,
+    functionName: 'owner',
+  })
 
-  const { data: isOwner } = useContractRead({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: "owner",
-  });
+  const { writeContract: createEvent, data: createEventData } = useWriteContract()
 
-  const { writeAsync: registerUser, isPending: isRegisterLoading } =
-    useContractWrite({
-      address: CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
-      functionName: "registerUser",
-    });
+  const { writeContract: register, data: registerData } = useWriteContract()
 
-  const { writeAsync: topUp, isPending: isTopUpLoading } = useContractWrite({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: "topUp",
-  });
+  const { data: eventDetails, isLoading: isLoadingEventDetails } = useReadContract({
+    address: contractAddress,
+    abi: contractABI,
+    functionName: 'getEventDetails',
+    args: eventId ? [BigInt(eventId)] : undefined,
+  })
 
-  const { writeAsync: withdraw, isPending: isWithdrawLoading } =
-    useContractWrite({
-      address: CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
-      functionName: "withdraw",
-    });
+  const { writeContract: toggleEventStatus, data: toggleEventStatusData } = useWriteContract()
 
-  const handleRegister = async () => {
-    try {
-      await registerUser();
-      setSuccess("Registration successful!");
-    } catch (err) {
-      setError("Registration failed. Please try again.");
+  const { isLoading: isCreatingEvent } = useWaitForTransactionReceipt({
+    hash: createEventData,
+  })
+
+  const { isLoading: isRegistering } = useWaitForTransactionReceipt({
+    hash: registerData,
+  })
+
+  const { isLoading: isTogglingStatus } = useWaitForTransactionReceipt({
+    hash: toggleEventStatusData,
+  })
+
+  const handleCreateEvent = () => {
+    if (createEvent) {
+      createEvent({
+        address: contractAddress,
+        abi: contractABI,
+        functionName: 'createEvent',
+        args: [eventName, BigInt(new Date(eventDate).getTime() / 1000), nftAddress, BigInt(maxCapacity)],
+      })
+      toast({
+        title: "Creating Event",
+        description: "Your event is being created. Please wait for confirmation.",
+      })
     }
-  };
+  }
 
-  const handleTopUp = async () => {
-    try {
-      await topUp({
-        args: [],
-        value: parseEther(topUpAmount),
-      });
-      setSuccess("Top-up successful!");
-      setTopUpAmount("");
-    } catch (err) {
-      setError("Top-up failed. Please try again.");
+  const handleRegister = () => {
+    if (register && eventId) {
+      register({
+        address: contractAddress,
+        abi: contractABI,
+        functionName: 'registerForEvent',
+        args: [BigInt(eventId)],
+      })
+      toast({
+        title: "Registering",
+        description: "Your registration is being processed. Please wait for confirmation.",
+      })
     }
-  };
+  }
 
-  const handleWithdraw = async () => {
-    try {
-      await withdraw();
-      setSuccess("Withdrawal successful!");
-    } catch (err) {
-      setError("Withdrawal failed. Please try again.");
+  const handleToggleStatus = () => {
+    if (toggleEventStatus && eventId) {
+      toggleEventStatus({
+        address: contractAddress,
+        abi: contractABI,
+        functionName: 'toggleEventStatus',
+        args: [BigInt(eventId)],
+      })
+      toast({
+        title: "Toggling Event Status",
+        description: "The event status is being updated. Please wait for confirmation.",
+      })
     }
-  };
+  }
+
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light')
+    document.documentElement.classList.toggle('dark')
+  }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
-      <Card className="max-w-4xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold">
-            Pay-As-You-Go Electricity dApp
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4">
+    <div className={`min-h-screen ${theme === 'dark' ? 'dark' : ''}`}>
+      <div className="container mx-auto p-4">
+        <header className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold">NFT Gated Event Manager</h1>
+          <div className="flex items-center space-x-4">
             <ConnectButton />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={toggleTheme}>
+                    {theme === 'light' ? <Moon className="h-[1.2rem] w-[1.2rem]" /> : <Sun className="h-[1.2rem] w-[1.2rem]" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Toggle theme</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
-          {isConnected && !isRegistered && (
-            <Alert>
-              <User className="h-4 w-4" />
-              <AlertTitle>Register your account</AlertTitle>
-              <AlertDescription>
-                You need to register before using the dApp.
-                <Button
-                  onClick={handleRegister}
-                  disabled={isRegisterLoading}
-                  className="mt-2"
-                >
-                  {isRegisterLoading ? "Registering..." : "Register Now"}
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-          {isConnected && isRegistered && (
-            <Tabs defaultValue="dashboard">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+        </header>
+
+        {isConnected && isOwner === address && (
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">Create Event</h2>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="eventName">Event Name</Label>
+                <Input id="eventName" value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="Enter event name" />
+              </div>
+              <div>
+                <Label htmlFor="eventDate">Event Date</Label>
+                <Input id="eventDate" type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor="nftAddress">NFT Contract Address</Label>
+                <Input id="nftAddress" value={nftAddress} onChange={(e) => setNftAddress(e.target.value)} placeholder="Enter NFT contract address" />
+              </div>
+              <div>
+                <Label htmlFor="maxCapacity">Max Capacity</Label>
+                <Input id="maxCapacity" type="number" value={maxCapacity} onChange={(e) => setMaxCapacity(e.target.value)} placeholder="Enter max capacity" />
+              </div>
+              <Button onClick={handleCreateEvent} disabled={isCreatingEvent}>
+                {isCreatingEvent ? 'Creating...' : 'Create Event'}
+              </Button>
+            </div>
+          </section>
+        )}
+
+        <section className="mb-8">
+          <h2 className="text-xl font-semibold mb-4">Register for Event</h2>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="registerEventId">Event ID</Label>
+              <Input id="registerEventId" type="number" value={eventId} onChange={(e) => setEventId(e.target.value)} placeholder="Enter event ID" />
+            </div>
+            <Button onClick={handleRegister} disabled={isRegistering}>
+              {isRegistering ? 'Registering...' : 'Register'}
+            </Button>
+          </div>
+        </section>
+
+        <section className="mb-8">
+          <h2 className="text-xl font-semibold mb-4">View Event Details</h2>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="viewEventId">Event ID</Label>
+              <Input id="viewEventId" type="number" value={eventId} onChange={(e) => setEventId(e.target.value)} placeholder="Enter event ID" />
+            </div>
+            <Button onClick={() => {}} disabled={isLoadingEventDetails}>
+              {isLoadingEventDetails ? 'Loading...' : 'View Details'}
+            </Button>
+            {eventDetails && (
+              <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <p><strong>Name:</strong> {eventDetails[0]}</p>
+                <p><strong>Date:</strong> {new Date(Number(eventDetails[1]) * 1000).toLocaleString()}</p>
+                <p><strong>Max Capacity:</strong> {eventDetails[2].toString()}</p>
+                <p><strong>Registered Count:</strong> {eventDetails[3].toString()}</p>
+                <p><strong>Status:</strong> {eventDetails[4] ? 'Active' : 'Inactive'}</p>
                 {isOwner === address && (
-                  <TabsTrigger value="admin">Admin Panel</TabsTrigger>
+                  <div className="mt-2">
+                    <Label htmlFor="eventStatus">Event Status</Label>
+                    <Switch
+                      id="eventStatus"
+                      checked={eventDetails[4]}
+                      onCheckedChange={handleToggleStatus}
+                      disabled={isTogglingStatus}
+                    />
+                  </div>
                 )}
-              </TabsList>
-              <TabsContent value="dashboard">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Your Dashboard</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span>Current Balance:</span>
-                        <span className="text-2xl font-bold">
-                          {balance?.formatted} {balance?.symbol}
-                        </span>
-                      </div>
-                      <div>
-                        <Input
-                          type="number"
-                          placeholder="Amount to top up (ETH)"
-                          value={topUpAmount}
-                          onChange={(e) => setTopUpAmount(e.target.value)}
-                        />
-                        <Button
-                          onClick={handleTopUp}
-                          disabled={isTopUpLoading || !topUpAmount}
-                          className="mt-2 w-full"
-                        >
-                          {isTopUpLoading ? "Processing..." : "Top Up"}
-                          <PlusCircle className="ml-2 h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              {isOwner === address && (
-                <TabsContent value="admin">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Admin Panel</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <Button
-                        onClick={handleWithdraw}
-                        disabled={isWithdrawLoading}
-                        className="w-full"
-                      >
-                        {isWithdrawLoading ? "Processing..." : "Withdraw Funds"}
-                        <Wallet className="ml-2 h-4 w-4" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              )}
-            </Tabs>
-          )}
-          {error && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          {success && (
-            <Alert variant="default" className="mt-4">
-              <Zap className="h-4 w-4" />
-              <AlertTitle>Success</AlertTitle>
-              <AlertDescription>{success}</AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
     </div>
-  );
+  )
 }
