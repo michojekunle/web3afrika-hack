@@ -1,7 +1,7 @@
 # NFT-Gated EventManager
 
 ## Overview
-NFT-Gated EventManager is a Web3 project that allows event managers to create events that are accessible only to NFT holders. This ensures a unique and exclusive experience for attendees, leveraging the power of blockchain technology. The project is built with Solidity as the backend and Next.js for the frontend, and it is deployed on the Arbitrum chain.
+NFT-Gated EventManager is a Web3 product that allows event managers to create events accessible only to NFT holders. This ensures a unique and exclusive experience for attendees, leveraging the power of blockchain technology. The project is built with Solidity as the backend and Next.js for the frontend, and it is deployed on the Arbitrum chain.
 
 ## Features
 - **Event Creation**: Event managers can easily create events.
