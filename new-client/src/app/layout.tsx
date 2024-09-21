@@ -35,13 +35,7 @@ export default function RootLayout({
         className={cn("antialiased", fontHeading.variable, fontBody.variable)}
       >
         <Providers>
-          <div className="flex pb-16 md:pb-0 min-h-screen">
-            <Sidebar />
-            <div className="flex-1">
-              <Header />
               {children}
-            </div>
-          </div>
         </Providers>
       </body>
     </html>
